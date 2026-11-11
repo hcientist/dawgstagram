@@ -4,9 +4,42 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dawgstagram</title>
+    <meta name="description" content="Curate and share dog images (with filters!)">
     <link rel="icon" href="https://fav.mhciael.com/🐶">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Comic+Neue:wght@400;700&family=Roboto:wght@400;500;700&display=swap">
+    <link rel="stylesheet" href="css/style.css">
+    <!-- ES modules are deferred automatically, and need no build step. They do need to be served over http(s), not file://. -->
+    <script type="module" src="js/app.js"></script>
 </head>
 <body>
-    <h1>Dawgstagram</h1>
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="site-header">
+        <nav class="navbar" aria-label="Primary">
+            <a class="brand" href="#/">
+                <span class="brand-long">Dawgstagram</span>
+                <span class="brand-short" aria-hidden="true">DGram</span>
+            </a>
+            <ul class="nav-links">
+                <li><a href="#/" data-nav="home">Home</a></li>
+                <li><a href="#/favorites" data-nav="favorites"><span class="label-long">Favorites</span><span class="label-short" aria-hidden="true">Favs</span></a></li>
+                <li><a href="#/lists" data-nav="lists">Dawglists</a></li>
+                <li><a href="#/filters" data-nav="filters">Filters</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main id="main" tabindex="-1">
+        <noscript><p>Dawgstagram needs JavaScript to fetch and display dawgs.</p></noscript>
+    </main>
+
+    <footer class="site-footer">
+        <p>Dog photos courtesy of the <a href="https://dog.ceo/dog-api/">Dog API</a>. Your dawgs, lists, and filters are saved only in this browser. <a href="#/backup" data-nav="backup">Back up or restore</a></p>
+    </footer>
+
+    <!-- Screen-reader announcements and visible "toast" messages -->
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
 </body>
 </html>

@@ -1,0 +1,17 @@
+{
+  "name": "dawgstagram",
+  "private": true,
+  "description": "npm is used only to run tests. The app itself (src/) needs no build step or dependencies.",
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "test:chromium": "playwright test --project=chromium",
+    "test:offline": "playwright test --grep-invert @network",
+    "test:ui": "playwright test --ui",
+    "test:install-browsers": "playwright install chromium firefox webkit"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.0",
+    "http-server": "14.1.1"
+  }
+}
