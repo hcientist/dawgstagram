@@ -5,6 +5,9 @@
  * images, so tests don't depend on the network or on which random dogs the
  * real API returns.
  */
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { deflateSync } from 'node:zlib';
 import { test as base, expect } from '@playwright/test';
 
@@ -19,11 +22,17 @@ import { test as base, expect } from '@playwright/test';
  * WebKit tests run one at a time (see playwright.config.js) and each profile
  * starts by emptying OPFS.
  *
+ * Profiles go in a temporary directory with a plain-ASCII name: WebKit on
+ * Linux won't start if its profile path has characters like ’ (which test
+ * names, and so Playwright's per-test output paths, can contain).
+ *
  * `newProfile(options)` opens a page in another separate, empty profile, for
  * "a different browser" tests (sharing, restoring a backup).
  */
-async function webkitProfile(playwright, dir, options) {
+async function webkitProfile(playwright, options) {
+    const dir = await mkdtemp(join(tmpdir(), 'dawgstagram-webkit-'));
     const context = await playwright.webkit.launchPersistentContext(dir, options);
+    context.on('close', () => rm(dir, { recursive: true, force: true }).catch(() => {}));
     const page = context.pages()[0] ?? await context.newPage();
     await openBlankPage(page);
     await page.evaluate(async () => (await navigator.storage.getDirectory()).removeEntry('images', { recursive: true }).catch(() => {}));
@@ -32,20 +41,20 @@ async function webkitProfile(playwright, dir, options) {
 }
 
 export const test = base.extend({
-    newProfile: async ({ browser, browserName, playwright, baseURL }, use, testInfo) => {
+    newProfile: async ({ browser, browserName, playwright, baseURL }, use) => {
         const opened = [];
         await use(async (options = {}) => {
             const context = browserName === 'webkit'
-                ? await webkitProfile(playwright, testInfo.outputPath(`profile-${opened.length}`), { baseURL, ...options })
+                ? await webkitProfile(playwright, { baseURL, ...options })
                 : await browser.newContext({ baseURL, ...options });
             opened.push(context);
             return context.pages()[0] ?? context.newPage();
         });
         await Promise.all(opened.map((context) => context.close()));
     },
-    context: async ({ context, browserName, playwright, baseURL, viewport }, use, testInfo) => {
+    context: async ({ context, browserName, playwright, baseURL, viewport }, use) => {
         if (browserName !== 'webkit') return use(context);
-        const persistent = await webkitProfile(playwright, testInfo.outputPath('profile'), { baseURL, viewport });
+        const persistent = await webkitProfile(playwright, { baseURL, viewport });
         await use(persistent); // the built-in `page` fixture opens its page in this context
         await persistent.close();
     },
