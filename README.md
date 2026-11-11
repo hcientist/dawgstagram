@@ -115,6 +115,21 @@ Share links hold the whole dawg (image URL, filter, and descriptions) in the URL
 | `src/js/opfs-worker.js` | Writes OPFS files in browsers that only allow writing from a worker |
 | `src/js/backup.js` | Export and import (`#/backup`, linked in the footer) |
 | `src/js/zip.js` | Minimal zip writer/reader, no library |
+| `src/js/tones.js` | Duotone/multi-tone: turns `tones(…)` in filter code into SVG filters |
+| `src/js/dogApi.js` | Dog API calls |
+| `src/js/share.js` | Encodes and decodes share links |
+| `src/js/i18n.js` | Picks the best language from `metadata` |
+| `src/js/components.js` | Cards, menus, metadata editor, dawg editor dialog |
+| `src/js/views/*.js` | One file per page |
+
+Filter `code` is a [CSS `filter`](https://developer.mozilla.org/en-US/docs/Web/CSS/filter) value, like `sepia(1) hue-rotate(90deg)`.
+Unlike canvas pixel manipulation (e.g. Caman), CSS filters work on images from any website, and shared filter code can't run scripts.
+
+Filter code can also use `tones(…)`, Dawgstagram's own function for duotone and multi-tone effects: the image is turned gray, then the darkest parts get the first color, the brightest get the last, and shades in between blend through any colors in between.
+`tones(#450084, #8ee4d7)` is a duotone; it takes 2 to 8 hex colors and mixes with other functions, like `contrast(1.2) tones(#000, #450084, #fff)`.
+The filter editor has color pickers that write it for you.
+CSS can't do this on its own, so the app builds an [SVG filter](https://developer.mozilla.org/en-US/docs/Web/SVG/Element/feComponentTransfer) for each set of colors and points the image at it with `url(#…)`.
+People can't write `url()` in filter code themselves, since a shared filter could point anywhere.
 
 ### Backups
 
@@ -124,14 +139,6 @@ The **Back up or restore** page (footer link) exports everything as:
 * `dawgstagram-<date>.zip` (when "include uploaded images" is checked): `dawgstagram.json` plus `images/<file>` for each uploaded image.
 
 Importing accepts either and tells them apart by the file's contents, not its name. It replaces everything currently in the app (after a confirmation).
-| `src/js/dogApi.js` | Dog API calls |
-| `src/js/share.js` | Encodes and decodes share links |
-| `src/js/i18n.js` | Picks the best language from `metadata` |
-| `src/js/components.js` | Cards, menus, metadata editor, dawg editor dialog |
-| `src/js/views/*.js` | One file per page |
-
-Filter `code` is a [CSS `filter`](https://developer.mozilla.org/en-US/docs/Web/CSS/filter) value, like `sepia(1) hue-rotate(90deg)`.
-Unlike canvas pixel manipulation (e.g. Caman), CSS filters work on images from any website, and shared filter code can't run scripts.
 
 ## Testing
 
@@ -150,13 +157,14 @@ npm run test:ui                 # Playwright's interactive test runner
 * Tests serve `src/` on port **4174**: a different origin than wherever you run the app, so they never see or change your own dawgs. Every test also starts with an empty browser profile.
 * The Dog API is mocked (`tests/helpers.js`) so results don't depend on the network or on which random dogs come back. `tests/live.spec.js` is the exception.
 * After a failure, `npx playwright show-report` shows what happened, including a trace of each failed test.
+* GitHub Actions runs the tests on every push and pull request ([`.github/workflows/test.yml`](.github/workflows/test.yml)); the HTML report is attached to each run as `playwright-report`.
 
 | File | Tests |
 | --- | --- |
-| `tests/store.spec.js` | Dawg/list/filter CRUD, handles, reordering, share links, caption language |
+| `tests/store.spec.js` | Dawg/list/filter CRUD, handles, reordering, `tones()`, share links, caption language |
 | `tests/images.spec.js` | OPFS storage, retries, cleanup, the older-Safari worker path |
 | `tests/backup.spec.js` | Export/import (JSON and zip), bad files, a zip from another tool (`tests/fixtures/`) |
-| `tests/ui.spec.js` | Clicking through the app: search, favorites, lists, editing, uploads, filters, sharing, backups, phone layout |
+| `tests/ui.spec.js` | Clicking through the app: search, favorites, lists, editing, uploads, filters (including the duotone color pickers), sharing, backups, phone layout |
 | `tests/live.spec.js` | Real Dog API; favorited images are saved from the browser cache |
 
 ## References

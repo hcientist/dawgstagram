@@ -68,7 +68,7 @@ test('JSON export restores everything except uploaded images, in another browser
 
     const other = await freshPage(newProfile);
     const { summary, data } = await importBackup(other, buffer, 'x.json');
-    expect(summary).toEqual({ dawgs: 2, lists: 2, filters: 8, uploadsMissing: 1 });
+    expect(summary).toEqual({ dawgs: 2, lists: 2, filters: 9, uploadsMissing: 1 });
     expect(data.lists).toEqual(lists);
     const mine = Object.values(data.dawgs).find((d) => d.metadata.en.title === 'Mine');
     expect(mine.file).toBeNull(); // kept, with descriptions, but no picture

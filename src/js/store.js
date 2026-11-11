@@ -11,12 +11,15 @@
  * "opfs:<file>" for uploads.
  *
  * `filter` on a Dawg is a Filter handle ('' for none). A Filter's `code` is a
- * CSS filter value, e.g. "sepia(0.8) contrast(1.2)".
+ * CSS filter value, e.g. "sepia(0.8) contrast(1.2)", which may also use
+ * tones(...) for duotone and multi-tone (see tones.js). filterCss() turns it
+ * into something an element's style.filter accepts.
  *
  * Every mutation saves and then notifies subscribers, so views can re-render.
  */
 
 import * as images from './images.js';
+import { toCss, tonesAreValid, withoutTones } from './tones.js';
 
 const STORAGE_KEY = 'dawgstagram:v1';
 export const FAVORITES = 'Favorites';
@@ -29,6 +32,7 @@ const SEED_FILTERS = [
     ['Invert', 'invert(1)', 'Swaps every color for its opposite.'],
     ['Purple Pride', 'sepia(1) hue-rotate(220deg) saturate(2.5)', 'Tints everything JMU purple.'],
     ['Dreamy', 'blur(2px) brightness(1.1) saturate(1.2)', 'Soft focus and bright.'],
+    ['JMU Duotone', 'tones(#450084, #8ee4d7)', 'Purple shadows and ice-blue highlights.'],
 ].map(([title, code, description]) => ({
     handle: slugify(title),
     code,
@@ -288,7 +292,7 @@ export const allFilters = () =>
 export const findFilterByCode = (code) => allFilters().find((f) => f.code === code);
 
 /** The CSS filter value for a dawg (or '' if it has none). */
-export const filterCss = (dawg) => state.filters[dawg?.filter]?.code ?? '';
+export const filterCss = (dawg) => toCss(state.filters[dawg?.filter]?.code ?? '');
 
 export function createFilter({ code, metadata = {} }) {
     const handle = uniqueHandle(slugify(firstTitle(metadata) ?? 'filter'), state.filters);
@@ -309,9 +313,14 @@ export function deleteFilter(handle) {
     commit();
 }
 
-/** Is `code` something the browser accepts as a CSS `filter` value? External url() references are not allowed. */
+/**
+ * Is `code` a CSS `filter` value the browser accepts, plus Dawgstagram's own
+ * tones(...)? url() isn't allowed: a shared filter could point anywhere.
+ */
 export function isValidFilterCode(code) {
-    return code.trim() === '' || (!/url\s*\(/i.test(code) && CSS.supports('filter', code));
+    if (code.trim() === '') return true;
+    if (/url\s*\(/i.test(code) || !tonesAreValid(code)) return false;
+    return CSS.supports('filter', withoutTones(code));
 }
 
 /* ---------- backup ---------- */

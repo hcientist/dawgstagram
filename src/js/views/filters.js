@@ -8,6 +8,7 @@ import { el, replaceChildren, rerender, toast, uid } from '../dom.js';
 import * as store from '../store.js';
 import { metadataEditor, confirmAction, filterTitle, dawgImg } from '../components.js';
 import { pickLanguage } from '../i18n.js';
+import { toCss, firstStops, hasTones, setTones, MAX_STOPS } from '../tones.js';
 
 const FALLBACK_SAMPLE = 'https://images.dog.ceo/breeds/retriever-golden/n02099601_3004.jpg';
 
@@ -32,7 +33,8 @@ export function filtersView(main) {
         el('p', { class: 'muted' },
             'Filters change how a dawg looks. Each one is a ',
             el('a', { href: 'https://developer.mozilla.org/en-US/docs/Web/CSS/filter' }, 'CSS filter'),
-            ' such as ', el('code', {}, 'sepia(1) hue-rotate(90deg)'), '.',
+            ' such as ', el('code', {}, 'sepia(1) hue-rotate(90deg)'), ', plus Dawgstagram’s own ',
+            el('code', {}, 'tones()'), ' for duotone and multi-tone effects.',
         ),
         editorRegion,
         el('h2', {}, 'Your filters'),
@@ -73,10 +75,16 @@ function filterEditor(handle, onDone) {
         oninput: () => {
             const ok = store.isValidFilterCode(code.value);
             error.textContent = ok ? '' : 'Your browser doesn’t understand that filter yet.';
-            if (ok) after.style.filter = code.value;
+            if (ok) after.style.filter = toCss(code.value);
         },
     });
-    after.style.filter = filter.code;
+    after.style.filter = toCss(filter.code);
+
+    /** Put builder colors into the code box, and update the preview. */
+    const applyTones = (stops) => {
+        code.value = setTones(code.value, stops);
+        code.dispatchEvent(new Event('input'));
+    };
 
     const meta = metadataEditor(FILTER_FIELDS, filter.metadata);
 
@@ -107,9 +115,10 @@ function filterEditor(handle, onDone) {
                 el('div', { class: 'field' },
                     el('label', { for: codeId }, 'Filter code (CSS)'),
                     code,
-                    el('span', { class: 'hint' }, 'Combine functions like blur(), brightness(), contrast(), grayscale(), hue-rotate(), invert(), opacity(), saturate(), sepia(), and drop-shadow().'),
+                    el('span', { class: 'hint' }, 'Combine functions like blur(), brightness(), contrast(), grayscale(), hue-rotate(), invert(), opacity(), saturate(), sepia(), drop-shadow(), and tones(#450084, #8ee4d7).'),
                     error,
                 ),
+                tonesBuilder(firstStops(filter.code), applyTones, () => hasTones(code.value)),
                 meta.node,
             ),
             el('div', { class: 'filter-preview', 'aria-label': 'Preview' },
@@ -129,6 +138,68 @@ function filterEditor(handle, onDone) {
     );
 }
 
+/**
+ * Color pickers for tones(): the first color replaces the darkest parts of the
+ * image and the last the brightest, with any others in between.
+ * Changing a color updates the code box once it has a tones(...) in it.
+ */
+function tonesBuilder(initial, apply, codeHasTones) {
+    let stops = initial ?? ['#450084', '#8ee4d7'];
+    const list = el('ol', { class: 'tone-stops' });
+    const gradient = el('div', { class: 'tone-gradient', 'aria-hidden': 'true' });
+    const addButton = el('button', { type: 'button', class: 'btn btn-secondary btn-small', onclick: () => {
+        stops.splice(stops.length - 1, 0, mix(stops[stops.length - 2], stops[stops.length - 1]));
+        changed();
+        render();
+        list.querySelectorAll('input')[stops.length - 2].focus();
+    } }, '+ Add a color');
+
+    const changed = () => {
+        gradient.style.background = `linear-gradient(to right, ${stops.join(', ')})`;
+        addButton.disabled = stops.length >= MAX_STOPS;
+        if (codeHasTones()) apply(stops);
+    };
+
+    function render() {
+        replaceChildren(list, stops.map((color, i) => {
+            const id = uid('tone');
+            const position = i === 0 ? ' (darkest)' : i === stops.length - 1 ? ' (lightest)' : '';
+            return el('li', {},
+                el('label', { for: id }, `Color ${i + 1}${position}`),
+                el('input', { id, type: 'color', value: color, oninput: (e) => { stops[i] = e.target.value; changed(); } }),
+                stops.length > 2 && el('button', {
+                    type: 'button', class: 'btn btn-secondary btn-small',
+                    onclick: () => {
+                        stops.splice(i, 1);
+                        changed();
+                        render();
+                        list.querySelectorAll('input')[Math.min(i, stops.length - 1)].focus();
+                    },
+                }, 'Remove', el('span', { class: 'visually-hidden' }, ` color ${i + 1}`)),
+            );
+        }));
+    }
+    render();
+    changed();
+
+    return el('fieldset', { class: 'tones-builder' },
+        el('legend', {}, 'Duotone and multi-tone'),
+        el('p', { class: 'hint' }, 'Turns the image gray, then recolors it: the first color for the darkest parts, the last for the brightest.'),
+        gradient,
+        list,
+        el('div', { class: 'row' },
+            addButton,
+            el('button', { type: 'button', class: 'btn btn-small', onclick: () => apply(stops) }, 'Use these colors'),
+        ),
+    );
+}
+
+/** The color halfway between two hex colors. */
+function mix(a, b) {
+    const channel = (hex, i) => parseInt(hex.slice(1 + i * 2, 3 + i * 2), 16);
+    return '#' + [0, 1, 2].map((i) => Math.round((channel(a, i) + channel(b, i)) / 2).toString(16).padStart(2, '0')).join('');
+}
+
 function filterCard(filter, onEdit) {
     const lang = pickLanguage(filter.metadata);
     const meta = filter.metadata[lang] ?? {};
@@ -138,7 +209,7 @@ function filterCard(filter, onEdit) {
 
     return el('li', { class: 'card' },
         el('figure', {},
-            el('div', { class: 'frame' }, dawgImg(sampleDawg(), { alt: '', loading: 'lazy', style: { filter: filter.code } })),
+            el('div', { class: 'frame' }, dawgImg(sampleDawg(), { alt: '', loading: 'lazy', style: { filter: toCss(filter.code) } })),
             el('figcaption', {},
                 el('h3', { lang }, title),
                 meta.description && el('p', { lang }, meta.description),

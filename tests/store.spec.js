@@ -12,7 +12,7 @@ test('starts with Favorites and the built-in filters', async ({ page }) => {
         return { lists: store.allLists().map((l) => l.handle), filters: store.allFilters().length };
     });
     expect(result.lists).toEqual(['Favorites']);
-    expect(result.filters).toBe(7);
+    expect(result.filters).toBe(8);
 });
 
 test('dawg and list CRUD, including orphan cleanup', async ({ page }) => {
@@ -140,4 +140,33 @@ test('picks the caption language closest to the viewer', async ({ newProfile }) 
         ];
     });
     expect(picks).toEqual(['pt-BR', 'pt', 'fr', undefined]);
+});
+
+test('tones(): validation, and turning it into an SVG filter', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+        const store = await import('/js/store.js');
+        const tones = await import('/js/tones.js');
+        const css = tones.toCss('contrast(1.2) tones(#000, #450084, #FFFFFF)');
+        const id = /url\("#([\w-]+)"\)/.exec(css)?.[1];
+        const filter = document.getElementById(id);
+        tones.toCss('tones(#000, #450084, #ffffff)'); // same colors: reuses the same filter
+        return {
+            css,
+            filters: document.querySelectorAll('svg filter').length,
+            tables: [...filter.querySelectorAll('feComponentTransfer > *')].map((f) => f.getAttribute('tableValues')),
+            valid: ['tones(#000, #fff)', 'sepia(1) tones(#1b2a61,#fdd56b) blur(1px)', 'tones(#111, #222, #333, #444, #555, #666, #777, #888)']
+                .map(store.isValidFilterCode),
+            invalid: ['tones(#000)', 'tones(red, blue)', 'tones(#000, #fff', 'tones(#000, url(x))', 'tones(#000, #fff) banana(1)',
+                'tones(#111, #222, #333, #444, #555, #666, #777, #888, #999)'].map(store.isValidFilterCode),
+            set: [tones.setTones('', ['#000000', '#ffffff']), tones.setTones('blur(1px) tones(#111, #222)', ['#333333', '#444444'])],
+            first: tones.firstStops('sepia(1) tones(#abc, #123456)'),
+        };
+    });
+    expect(r.css).toBe('contrast(1.2) url("#tones-000000-450084-ffffff")');
+    expect(r.filters).toBe(1);
+    expect(r.tables).toEqual(['0.000 0.271 1.000', '0.000 0.000 1.000', '0.000 0.518 1.000']);
+    expect(r.valid).toEqual([true, true, true]);
+    expect(r.invalid).toEqual([false, false, false, false, false, false]);
+    expect(r.set).toEqual(['tones(#000000, #ffffff)', 'blur(1px) tones(#333333, #444444)']);
+    expect(r.first).toEqual(['#aabbcc', '#123456']);
 });

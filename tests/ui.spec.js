@@ -138,7 +138,73 @@ test('creating a filter, with validation', async ({ page }) => {
     await page.getByLabel('Title').fill('Upside');
     await page.getByRole('button', { name: 'Create filter' }).click();
     await expect(page.getByRole('heading', { name: 'Upside' })).toBeVisible();
-    await expect(cards(page)).toHaveCount(8);
+    await expect(cards(page)).toHaveCount(9);
+});
+
+/** The color [r, g, b] in the middle of an element, as the screen shows it (filters included). */
+async function centerPixel(page, locator) {
+    const png = (await locator.screenshot()).toString('base64');
+    return page.evaluate(async (src) => {
+        const img = new Image();
+        img.src = `data:image/png;base64,${src}`;
+        await img.decode();
+        const canvas = Object.assign(document.createElement('canvas'), { width: img.width, height: img.height });
+        const context = canvas.getContext('2d');
+        context.drawImage(img, 0, 0);
+        return [...context.getImageData(img.width / 2, img.height / 2, 1, 1).data.slice(0, 3)];
+    }, png);
+}
+
+test('building a duotone filter with color pickers', async ({ page }) => {
+    await page.goto('/#/filters');
+    await page.getByText('+ Create a new filter').click();
+    const code = page.getByLabel('Filter code (CSS)');
+    const after = page.getByRole('img', { name: 'Sample dawg with this filter' });
+    await code.fill('contrast(1.1)');
+
+    await page.getByLabel('Color 1 (darkest)').fill('#ff0000');
+    await expect(code).toHaveValue('contrast(1.1)'); // not written until asked
+    await page.getByLabel('Color 2 (lightest)').fill('#ff0000');
+    await page.getByRole('button', { name: 'Use these colors' }).click();
+    await expect(code).toHaveValue('contrast(1.1) tones(#ff0000, #ff0000)');
+    await expect(after).toHaveCSS('filter', /url\(.*#tones-ff0000-ff0000/);
+    // The sample image is purple; an all-red tone map makes every pixel red.
+    await expect.poll(() => centerPixel(page, after)).toEqual([255, 0, 0]);
+
+    // Once tones() is in the code, the pickers update it as they change.
+    await page.getByRole('button', { name: '+ Add a color' }).click();
+    await expect(page.getByLabel('Color 2', { exact: true })).toBeFocused();
+    await expect(code).toHaveValue('contrast(1.1) tones(#ff0000, #ff0000, #ff0000)');
+    await page.getByLabel('Color 3 (lightest)').fill('#8ee4d7');
+    await expect(code).toHaveValue('contrast(1.1) tones(#ff0000, #ff0000, #8ee4d7)');
+    await page.getByRole('button', { name: 'Remove color 2' }).click();
+    await expect(code).toHaveValue('contrast(1.1) tones(#ff0000, #8ee4d7)');
+    await expect(page.getByRole('group', { name: 'Duotone and multi-tone' }).getByRole('button', { name: /^Remove/ })).toHaveCount(0); // two colors is the minimum
+
+    await page.getByLabel('Title').fill('Red Teal');
+    await page.getByRole('button', { name: 'Create filter' }).click();
+    const card = cards(page).filter({ hasText: 'Red Teal' });
+    await expect(card.locator('pre')).toHaveText('contrast(1.1) tones(#ff0000, #8ee4d7)');
+    await expect(card.locator('img')).toHaveCSS('filter', /url\(.*#tones-ff0000-8ee4d7/);
+
+    // Editing a filter starts the pickers at its colors.
+    await card.getByRole('button', { name: /Edit/ }).click();
+    await expect(page.getByLabel('Color 1 (darkest)')).toHaveValue('#ff0000');
+    await expect(page.getByLabel('Color 2 (lightest)')).toHaveValue('#8ee4d7');
+});
+
+test('a shared dawg keeps its duotone filter', async ({ page, newProfile }) => {
+    await favoriteFirstResult(page);
+    await page.goto('/#/favorites');
+    await page.getByLabel('Filter for Pug').selectOption('jmu-duotone');
+    await page.getByRole('link', { name: /Share\s+Pug/ }).click();
+    const url = await page.getByLabel('Link').inputValue();
+
+    const friend = await newProfile();
+    await mockDogApi(friend);
+    await friend.goto(url);
+    await expect(friend.locator('main img')).toHaveCSS('filter', /url\(.*#tones-450084-8ee4d7/);
+    await expect(friend.locator('#tones-450084-8ee4d7')).toBeAttached();
 });
 
 test('sharing a dawg with someone else', async ({ page, newProfile }) => {
@@ -187,7 +253,7 @@ test('backing up to a zip and restoring in another browser', async ({ page, newP
     await other.goto('/#/backup');
     await other.getByLabel('Backup file').setInputFiles(path);
     await other.getByRole('button', { name: /Import backup/ }).click();
-    await expect(other.locator('main').getByRole('status').filter({ hasText: 'Imported' })).toHaveText(/Imported 2 dawgs, 1 list, and 7 filters\./);
+    await expect(other.locator('main').getByRole('status').filter({ hasText: 'Imported' })).toHaveText(/Imported 2 dawgs, 1 list, and 8 filters\./);
     await other.goto('/#/favorites');
     await expect(other.locator('main .card')).toHaveCount(2);
     await expect(other.locator('main .card img').first()).toHaveAttribute('src', /^blob:/);

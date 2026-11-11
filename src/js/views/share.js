@@ -8,6 +8,7 @@ import * as store from '../store.js';
 import { shareUrl, decodeShare } from '../share.js';
 import { dawgFigure } from '../components.js';
 import * as images from '../images.js';
+import { toCss } from '../tones.js';
 
 export function shareView(main, param) {
     const own = store.getDawg(param);
@@ -81,7 +82,7 @@ function visitorView(main, shared) {
 
     replaceChildren(main, el('section', { class: 'share' },
         el('h1', {}, 'Someone shared a dawg with you! 🐶'),
-        dawgFigure({ src: shared.src, metadata: shared.metadata, css: shared.filter?.code ?? '', headingLevel: 'h2', big: true }),
+        dawgFigure({ src: shared.src, metadata: shared.metadata, css: sharedFilterCss(shared), headingLevel: 'h2', big: true }),
         el('div', { class: 'row', style: { marginTop: '1rem' } },
             el('button', {
                 type: 'button', class: 'btn', disabled: alreadySaved,
@@ -101,6 +102,11 @@ function visitorView(main, shared) {
             el('a', { class: 'btn btn-secondary', href: '#/' }, 'Find more dawgs'),
         ),
     ));
+}
+
+/** The CSS for a shared dawg's filter ('' if it has none, or the link's filter code isn't valid). */
+function sharedFilterCss({ filter }) {
+    return filter && store.isValidFilterCode(filter.code) ? toCss(filter.code) : '';
 }
 
 /** Add a shared dawg (and its filter, if new to this browser) to Favorites. */

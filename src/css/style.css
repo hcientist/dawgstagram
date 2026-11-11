@@ -504,3 +504,33 @@ dialog footer .spacer { flex: 1; }
 @media (prefers-reduced-motion: reduce) {
     .toast { transition: none; }
 }
+
+/* Duotone / multi-tone color pickers in the filter editor */
+.tones-builder { margin-bottom: 1rem; }
+.tone-gradient {
+    height: 1rem;
+    border-radius: 0.25rem;
+    border: 1px solid var(--border);
+    margin-bottom: 0.5rem;
+}
+.tone-stops {
+    list-style: none;
+    margin: 0 0 0.75rem;
+    padding: 0;
+    display: grid;
+    gap: 0.4rem;
+}
+.tone-stops li {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.tone-stops label { min-width: 9rem; }
+.tone-stops input[type="color"] {
+    width: 3rem;
+    height: 2rem;
+    padding: 0.1rem;
+    border: 1px solid #999;
+    border-radius: 0.25rem;
+    background: white;
+}
