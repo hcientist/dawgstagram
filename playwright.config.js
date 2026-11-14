@@ -23,7 +23,7 @@ export default defineConfig({
         { name: 'webkit', use: { ...devices['Desktop Safari'] }, workers: 1 },
     ],
     webServer: {
-        command: `npx http-server src -p ${PORT} -c-1 --silent`,
+        command: `npx http-server . -p ${PORT} -c-1 --silent`,
         url: `http://localhost:${PORT}`,
         reuseExistingServer: false,
     },
